@@ -7,7 +7,6 @@ class Client:
         self.port = port
         self.clientSocket = socket.socket(socket.AF_INET, \
                                                 socket.SOCK_STREAM)
-        self.input = [self.clientSocket,sys.stdin]
 
     def _connect(self):
         self.clientSocket.connect((self.host, self.port))
