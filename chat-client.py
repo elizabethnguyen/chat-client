@@ -23,15 +23,9 @@ def main():
     port = raw_input("Please specify the port: ")
 
     if host is '':
-        try:
-            run_server(host, port)
-        except:
-            print "Unable to host at the specified port."
+        run_server(host, port)
     else:
-        try:
-            run_client(host, port)
-        except:
-            print "Unable to connect to the specified host."        
+        run_client(host, port)
 
 # SERVER FUNCTION
 # (1): hosts a connection on specified port. Establishes a connection with a client
@@ -48,10 +42,8 @@ def run_server(host, port):
     selfServer = Server(host, int(port)) # (1)
     input = [selfServer.serverSocket, sys.stdin] # (2)
     clientList = [] # (3)
+    pendingClientList = []
     selfServer._listen()
-    client = selfServer._accept()
-    input.append(client)
-    clientList.append(client)
     running = 1
 
     while running is 1: 

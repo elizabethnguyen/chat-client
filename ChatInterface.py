@@ -35,7 +35,7 @@ class ChatInterface:
         self.screen.hline(3,curses.COLS-25,curses.ACS_URCORNER,1) # Upper-Right Corner
         self.screen.vline(4,1,curses.ACS_VLINE,curses.LINES-7) # Left Border
         self.screen.vline(4,curses.COLS-25,curses.ACS_VLINE,curses.LINES-7) # Right Border
-        self.screen.hline(curses.LINES-7,1,curses.ACS_HLINE,curses.COLS-25) # Bottom Border
+        self.screen.hline(curses.LINES-5,1,curses.ACS_HLINE,curses.COLS-25) # Bottom Border
         self.screen.hline(curses.LINES-7,1,curses.ACS_LLCORNER,1) # Bottom-left Border
         self.screen.hline(curses.LINES-7,curses.COLS-25,curses.ACS_LRCORNER,1) # Bottom-right Border
 
