@@ -12,10 +12,21 @@ from ChatInterface import ChatInterface
 # (4): user aliasing.
 # (5): GUI that preserves the input window when a new message appears, as well as
 #      allowing 'pretty' features such as colors.
-
+# (6): Consider cleaning up my code by having generic strings pre-defined.
+#      (think of them like error codes)
+# (7): a 'cleanup' function that when called with a socket, will remove all traces
+#      of that socket in every list.
 
 # Buffer size for sending data to sockets.
 SIZE = 1024
+# Dictionary containing information on each user.
+users = {}
+# List of names/aliases logged in.
+nameList = []
+# List of connected (not pending) clients.
+clientList = [] # (3)
+# Input list for select().
+input = [sys.stdin]
 
 def main():
     host = raw_input("Welcome to the chat client. \nPlease type the IP you are trying " + \
@@ -42,17 +53,16 @@ def main():
 #      The list-value defines as follows: [name, address, op_status]
 #      op_status will be True or False.
 def run_server(host, port):
-    name = input_name()
+    name = input_name() # Prompts the server to provide a name.
     selfServer = Server(host, int(port)) # (1)
-    input = [selfServer.serverSocket, sys.stdin] # (2)
-    clientList = [] # (3)
-    pendingClients = []
-    nameList = [name]
-    users = {selfServer.serverSocket:[name, None, True]} # (6)
-    selfServer._listen()
-    running = 1
+    input.append(selfServer.serverSocket) # (2)
+    pendingClients = [] # For clients that have not yet specified a name.
+    nameList.append(name)
+    users.update({selfServer.serverSocket:[name, None, True]}) # (6)
+    selfServer._listen() # Listen for a connection!
+    running = True
 
-    while running is 1: 
+    while running is True: 
         inready,outready,exready = select.select(input,[],[]) 
 
         for s in inready:
@@ -64,7 +74,7 @@ def run_server(host, port):
                 users.update({client:[None,clientInformation[1], False]})
                 pendingClients.append(client)
             if s in pendingClients:
-                name = s.recv(10)
+                name = s.recv(16)
                 if name:
                     # Preventing duplicate names (for the most part).
                     if name not in nameList:
@@ -90,23 +100,40 @@ def run_server(host, port):
                 data = s.recv(SIZE)
                 name = users.get(s)[0]
                 if data:
-                    line = name + ": " + data
-                    sys.stdout.write(line)
-                    for client in clientList: # (3)
-                        if client is not s:
-                            client.send(line)
+                    tempData = data.rstrip("\r\n")
+                    splitData = tempData.split(" ", 1)
+                    splitData.append("\n") # Placeholder to fix argument issues...
+                    if splitData[0] in commandDict.keys():
+                        commandDict[splitData[0]](s, splitData[1])
+                    else:
+                        line = name + ": " + data
+                        sys.stdout.write(line)
+                        for client in clientList: # (3)
+                            if client is not s:
+                                client.send(line)
                 else: # (4)
                     s.close()
                     input.remove(s)
+                    nameList.remove(users.get(s)[0])
                     clientList.remove(s)
-                    print "%s has left the chat." % name
+                    leaveMsg = "%s has left the chat.\n" % name
+                    sys.stdout.write(leaveMsg)
+                    for client in clientList: # (3)
+                        if client is not s:
+                            client.send(leaveMsg)
             # Typing from the server to all clients.
             if s == sys.stdin: 
                 userText = sys.stdin.readline() 
-                name = users.get(selfServer.serverSocket)[0]
-                line = name + ": " + userText
-                for client in clientList:
-                    client.send(line)
+                tempData = userText.rstrip("\r\n")
+                splitData = tempData.split(" ", 1)
+                splitData.append("\n") # Placeholder to fix argument issues...
+                if splitData[0] in commandDict.keys():
+                    commandDict[splitData[0]](selfServer.serverSocket, splitData[1])           
+                else:
+                    name = users.get(selfServer.serverSocket)[0]
+                    line = name + ": " + userText
+                    for client in clientList:
+                        client.send(line)
 
     selfServer._close() # (5)
 
@@ -125,11 +152,11 @@ def run_client(host, port):
     name = input_name()
     selfClient = Client(host, int(port))
     selfClient._connect() # (1)
-    input = [selfClient.clientSocket, sys.stdin]
-    running = 1
+    input.append(selfClient.clientSocket)
     selfClient.clientSocket.send(name)
+    running = True
     
-    while running is 1: 
+    while running is True: 
         inready,outready,exready = select.select(input,[],[]) 
 
         for s in inready:
@@ -140,8 +167,8 @@ def run_client(host, port):
                     sys.stdout.write(data)
                 else: # (3)
                     s.close()
-                    print "The server has ended the connection."
-                    running = 0
+                    print "Connection closed."
+                    running = False
                     break
             # Sending information to the other users via the server.
             if s == sys.stdin: 
@@ -160,6 +187,87 @@ def input_name():
         else: 
             name = raw_input("Please enter a valid name: ")
     return name
+
+# Close connection from the server.
+def quit(clientSocket, *args):
+    try:
+        name = users.get(clientSocket)[0]
+        clientList.remove(clientSocket)
+        input.remove(clientSocket)
+        nameList.remove(users.get(clientSocket)[0])
+        leaveMsg = "%s has left the chat.\n" % name
+        sys.stdout.write(leaveMsg)
+        for client in clientList: 
+            if client is not clientSocket:
+                client.send(leaveMsg)
+        clientSocket.close()
+    except:
+        clientSocket.close()
+
+# Allow changing of the display name while connected. Must still
+# follow length and duplicate conventions.
+def change_name(clientSocket, *args):
+    if args[0] in nameList:
+        try:
+            clientSocket.send("Name already in use. Please try with another name.\n")
+        except:
+            sys.stdout.write("Name already in use. Please try with another name.\n")
+    elif len(args[0]) < 1 and len(args[0]) > 10:
+        try:
+            clientSocket.send("Name must be between 1 and 10 characters. Try again.\n")
+        except:
+            sys.stdout.write("Name must be between 1 and 10 characters. Try again.\n")
+    else:
+        tempInfo = users.get(clientSocket)
+        nameList.remove(tempInfo[0]) 
+        tempInfo[0] = args[0]
+        nameList.append(tempInfo[0])
+        users.update({clientSocket:tempInfo})
+
+# Based on op_status. Only continue if op_status = True.
+def kick_user(clientSocket, *args):
+    kickSuccess = False
+    if users.get(clientSocket)[2] is True:
+        if users.get(clientSocket)[0] == args[0]:
+            try:
+                clientSocket.send("You cannot kick yourself!\n")
+                return
+            except:
+                sys.stdout.write("You cannot kick yourself!\n")
+                return
+        for user in users:
+            if users.get(user)[0] == args[0]:
+                user.send("You have been kicked from the server.\n")
+                user.close()
+                input.remove(user)
+                nameList.remove(users.get(user)[0])
+                clientList.remove(user)
+                kickSuccess = True
+                for client in clientList: 
+                    if client is not clientSocket and client is not user:
+                        client.send("%s has been kicked from the server.\n" % args[0])
+                try:
+                    clientSocket.send("You have kicked %s from the server.\n" % args[0])
+                except:
+                    sys.stdout.write("You have kicked %s from the server.\n" % args[0])
+        if kickSuccess is False:
+            try:
+                clientSocket.send("Unable to kick %s.\n" % args[0])
+            except:
+                sys.stdout.write("Unable to kick %s.\n" % args[0])
+    else:
+        clientSocket.send("You do not have permission to do that.\n")
+
+def who(clientSocket, *args):
+    nameList.sort()
+    connected = ", ".join(nameList) + "\n"
+    try:
+        clientSocket.send(connected)
+    except:
+        sys.stdout.write(connected)
+
+# Dictionary containing the names of the functions associated with command input.
+commandDict = {"/quit": quit, "/name": change_name, "/kick": kick_user, "/who": who}
 
 if __name__ == '__main__':
     main()
