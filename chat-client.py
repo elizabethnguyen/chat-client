@@ -38,11 +38,17 @@ def main():
 #      These sockets are removed from the input and client list.
 # (5): no condition has been set to close the connection, but the socket is
 #      scheduled to close upon exiting the read/write loop.
+# (6): *NEW* a users dictionary uses the socket as a key, with a list as the value.
+#      The list-value defines as follows: [name, address, op_status]
+#      op_status will be True or False.
 def run_server(host, port):
+    name = input_name()
     selfServer = Server(host, int(port)) # (1)
     input = [selfServer.serverSocket, sys.stdin] # (2)
     clientList = [] # (3)
-    pendingClientList = []
+    pendingClients = []
+    nameList = [name]
+    users = {selfServer.serverSocket:[name, None, True]} # (6)
     selfServer._listen()
     running = 1
 
@@ -52,29 +58,55 @@ def run_server(host, port):
         for s in inready:
             # Accepting newly discovered connections.
             if s == selfServer.serverSocket:
-                client = selfServer._accept()
+                clientInformation = selfServer._accept()
+                client = clientInformation[0]
                 input.append(client)
-                clientList.append(client)
+                users.update({client:[None,clientInformation[1], False]})
+                pendingClients.append(client)
+            if s in pendingClients:
+                name = s.recv(10)
+                if name:
+                    # Preventing duplicate names (for the most part).
+                    if name not in nameList:
+                        tempInfo = users.get(s)
+                        tempInfo[0] = name
+                        users.update({client:tempInfo})
+                        clientList.append(s)
+                        nameList.append(name)
+                        pendingClients.remove(s)
+                    else:
+                        s.send("Name entered is already taken. Connection closed.\n")
+                        input.remove(s) 
+                        s.close()
+                        pendingClients.remove(s)
+                else:
+                    s.close()
+                    input.remove(s)
+                    pendingClients.remove(s) 
             # Receiving data from a client, if client is no longer sending data,
             # they are no longer connected (remove them).
             # This will write to all connected clients!
             if s in clientList:
                 data = s.recv(SIZE)
+                name = users.get(s)[0]
                 if data:
-                    sys.stdout.write(data)
+                    line = name + ": " + data
+                    sys.stdout.write(line)
                     for client in clientList: # (3)
                         if client is not s:
-                            client.send(data)
+                            client.send(line)
                 else: # (4)
                     s.close()
                     input.remove(s)
                     clientList.remove(s)
-                    print "User has left the chat."
+                    print "%s has left the chat." % name
             # Typing from the server to all clients.
             if s == sys.stdin: 
                 userText = sys.stdin.readline() 
+                name = users.get(selfServer.serverSocket)[0]
+                line = name + ": " + userText
                 for client in clientList:
-                    client.send(userText)
+                    client.send(line)
 
     selfServer._close() # (5)
 
@@ -90,11 +122,13 @@ def run_server(host, port):
 # (5): no condition has been set to close the connection, but the socket is
 #      scheduled to close upon exiting the read/write loop.
 def run_client(host, port):
+    name = input_name()
     selfClient = Client(host, int(port))
     selfClient._connect() # (1)
     input = [selfClient.clientSocket, sys.stdin]
     running = 1
-
+    selfClient.clientSocket.send(name)
+    
     while running is 1: 
         inready,outready,exready = select.select(input,[],[]) 
 
@@ -115,6 +149,17 @@ def run_client(host, port):
                 selfClient.clientSocket.send(userText) # (4)
 
     selfClient._close() # (5)
+
+# Self-explanatory (I hope) function that requires a name between 0 and 11
+# characters in length.
+def input_name():
+    name = raw_input("Enter a Name: ")
+    while True:
+        if len(name) > 0 and len(name) < 11:
+            break
+        else: 
+            name = raw_input("Please enter a valid name: ")
+    return name
 
 if __name__ == '__main__':
     main()

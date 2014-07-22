@@ -18,7 +18,7 @@ class Server:
 
     def _accept(self):
         self.clientSocket, self.clientAddress = self.serverSocket.accept()
-        return self.clientSocket
+        return self.clientSocket, self.clientAddress
 
     def _close(self):
         self.serverSocket.close()
