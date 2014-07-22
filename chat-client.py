@@ -3,6 +3,7 @@ import socket
 import sys
 from Server import Server
 from Client import Client
+from ChatInterface import ChatInterface
 
 # TO-DO:
 # (1): implement basic 'slash' ("/") commands, such as quit, whisper, emote, etc.
@@ -22,9 +23,15 @@ def main():
     port = raw_input("Please specify the port: ")
 
     if host is '':
-        run_server(host, port)
+        try:
+            run_server(host, port)
+        except:
+            print "Unable to host at the specified port."
     else:
-        run_client(host, port)
+        try:
+            run_client(host, port)
+        except:
+            print "Unable to connect to the specified host."        
 
 # SERVER FUNCTION
 # (1): hosts a connection on specified port. Establishes a connection with a client
