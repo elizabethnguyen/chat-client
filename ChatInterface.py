@@ -35,7 +35,7 @@ class ChatInterface:
         self.screen.hline(3,curses.COLS-25,curses.ACS_URCORNER,1) # Upper-Right Corner
         self.screen.vline(4,1,curses.ACS_VLINE,curses.LINES-7) # Left Border
         self.screen.vline(4,curses.COLS-25,curses.ACS_VLINE,curses.LINES-7) # Right Border
-        self.screen.hline(curses.LINES-5,1,curses.ACS_HLINE,curses.COLS-25) # Bottom Border
+        self.screen.hline(curses.LINES-7,1,curses.ACS_HLINE,curses.COLS-25) # Bottom Border
         self.screen.hline(curses.LINES-7,1,curses.ACS_LLCORNER,1) # Bottom-left Border
         self.screen.hline(curses.LINES-7,curses.COLS-25,curses.ACS_LRCORNER,1) # Bottom-right Border
 
@@ -49,11 +49,36 @@ class ChatInterface:
         self.screen.hline(curses.LINES-4,1,curses.ACS_LLCORNER,1) # Bottom-left Border
         self.screen.hline(curses.LINES-4,curses.COLS-25,curses.ACS_LRCORNER,1) # Bottom-right Border
 
-        self.screen.addstr(0,curses.COLS/2 - 30, "The Super-Fantastic LizChat 1.0") # Clever title
+        # THE FOLLOWING IS FOR USERWINDOW
+        self.screen.hline(3,curses.COLS-24,curses.ACS_HLINE,20) # Top Border
+        self.screen.hline(curses.LINES-17,curses.COLS-24,curses.ACS_HLINE,20) # Bottom Border
+        self.screen.vline(4,curses.COLS-24,curses.ACS_VLINE,curses.LINES-21) # Left Border
+        self.screen.vline(4,curses.COLS-4,curses.ACS_VLINE,curses.LINES-21) # Right Border
+        self.screen.hline(3,curses.COLS-24,curses.ACS_ULCORNER,1) # Upper-left Corner
+        self.screen.hline(3,curses.COLS-4,curses.ACS_URCORNER,1) # Upper-right Corner
+        self.screen.hline(curses.LINES-17,curses.COLS-24,curses.ACS_LLCORNER,1) # Bottom-left Corner
+        self.screen.hline(curses.LINES-17,curses.COLS-4,curses.ACS_LRCORNER,1) # Bottom-right Corner
+
+        # THE FOLLOWING IS FOR CHANNELWINDOW
+        self.screen.hline(curses.LINES-16,curses.COLS-24,curses.ACS_HLINE,20) # Top Border
+        self.screen.hline(curses.LINES-4,curses.COLS-24,curses.ACS_HLINE,20) # Bottom Border
+        self.screen.vline(curses.LINES-15,curses.COLS-24,curses.ACS_VLINE,curses.LINES-27) # Left Border
+        self.screen.vline(curses.LINES-15,curses.COLS-4,curses.ACS_VLINE,curses.LINES-27) # Right Border
+        self.screen.hline(curses.LINES-16,curses.COLS-24,curses.ACS_ULCORNER,1) # Upper-left Corner
+        self.screen.hline(curses.LINES-16,curses.COLS-4,curses.ACS_URCORNER,1) # Upper-right Corneer
+        self.screen.hline(curses.LINES-4,curses.COLS-24,curses.ACS_LLCORNER,1) # Bottom-left Corner
+        self.screen.hline(curses.LINES-4,curses.COLS-4,curses.ACS_LRCORNER,1) # Bottom-right Corner
+
+        self.screen.addstr(0,curses.COLS/3, "The Super-Fantastic LizChat 1.0") # Clever title
         self.chatWindow = curses.newwin(curses.LINES-11,curses.COLS-27,CHAT_Y,2) # Chat Window
         self.inputWindow = curses.newwin(1,curses.COLS-27,curses.LINES-5,2) # Input Window
-       
+        self.userWindow = curses.newwin(curses.LINES-11,18,CHAT_Y,curses.COLS-23) # User Window
+        self.channelWindow = curses.newwin(11,19, curses.LINES-15,curses.COLS-23) # Channels Window
+      
         self.chatWindow.scrollok(True)
+        self.userWindow.scrollok(True)
+        self.channelWindow.scrollok(True)
+        curses.noecho()
  
         self.screen.refresh()
         self.chatWindow.refresh()
