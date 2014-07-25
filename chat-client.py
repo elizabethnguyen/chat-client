@@ -3,30 +3,35 @@ import socket
 import sys
 from Server import Server
 from Client import Client
-from ChatInterface import ChatInterface
+# from ChatInterface import ChatInterface
 
 # TO-DO:
 # (1): implement basic 'slash' ("/") commands, such as quit, whisper, emote, etc.
 # (2): implement hierarchal-dependent commands, such as user versus server privileges.
 # (3): consider if the server should also be able to write.
-# (4): user aliasing.
-# (5): GUI that preserves the input window when a new message appears, as well as
+# (4): GUI that preserves the input window when a new message appears, as well as
 #      allowing 'pretty' features such as colors.
-# (6): Consider cleaning up my code by having generic strings pre-defined.
-#      (think of them like error codes)
-# (7): a 'cleanup' function that when called with a socket, will remove all traces
-#      of that socket in every list.
+# (5): change the server to be non interactive (i.e., the server does not chat with clients)
+# (6): consider adding authentication and predetermined states (server keeps track of
+#      accounts, ops, etc.
 
-# Buffer size for sending data to sockets.
-SIZE = 1024
-# Dictionary containing information on each user.
-users = {}
-# List of names/aliases logged in.
-nameList = []
-# List of connected (not pending) clients.
-clientList = [] # (3)
-# Input list for select().
-input = [sys.stdin]
+SIZE = 1024 # Buffer size for sending data to sockets (power of 2).
+users = {} # Dictionary containing information on each user.
+nameList = [] # List of names/aliases logged in.
+clientList = [] # List of connected (not pending) clients.
+pendingClients = [] # For clients that have not yet specified a name.
+input = [sys.stdin] # Input list for select().
+
+ERROR_MSG = {'nameTaken': "Name entered is already taken. Try again.\n", \
+             'nameLen'  : "Name must be between 1 and 10 characters. Try again.\n", \
+             'leaveMsg' : "{name} has left the chat.\n", \
+             'conClosed': "Connection closed.\n", \
+             'kickSelf' : "You cannot kick yourself!\n", \
+             'youKicked': "You have been kicked from the server.\n", \
+             'youKick'  : "You have kicked {name} from the server.\n", \
+             'hasKicked': "{name} has been kicked from the server.\n", \
+             'noKick'   : "Unable to kick {name}.\n", \
+             'noPerms'  : "You do not have the permission to do that.\n"}
 
 def main():
     host = raw_input("Welcome to the chat client. \nPlease type the IP you are trying " + \
@@ -53,13 +58,12 @@ def main():
 #      The list-value defines as follows: [name, address, op_status]
 #      op_status will be True or False.
 def run_server(host, port):
-    name = input_name() # Prompts the server to provide a name.
-    selfServer = Server(host, int(port)) # (1)
-    input.append(selfServer.serverSocket) # (2)
-    pendingClients = [] # For clients that have not yet specified a name.
+    name = input_name() 
+    selfServer = Server(host, int(port)) 
+    input.append(selfServer.serverSocket) 
     nameList.append(name)
-    users.update({selfServer.serverSocket:[name, None, True]}) # (6)
-    selfServer._listen() # Listen for a connection!
+    users.update({selfServer.serverSocket:[name, None, True]}) 
+    selfServer._listen() 
     running = True
 
     while running is True: 
@@ -85,14 +89,10 @@ def run_server(host, port):
                         nameList.append(name)
                         pendingClients.remove(s)
                     else:
-                        s.send("Name entered is already taken. Connection closed.\n")
-                        input.remove(s) 
-                        s.close()
-                        pendingClients.remove(s)
+                        s.send(ERROR_MSG['nameTaken'])
+                        cleanup(s)
                 else:
-                    s.close()
-                    input.remove(s)
-                    pendingClients.remove(s) 
+                    cleanup(s)
             # Receiving data from a client, if client is no longer sending data,
             # they are no longer connected (remove them).
             # This will write to all connected clients!
@@ -108,19 +108,15 @@ def run_server(host, port):
                     else:
                         line = name + ": " + data
                         sys.stdout.write(line)
-                        for client in clientList: # (3)
+                        for client in clientList:
                             if client is not s:
                                 client.send(line)
-                else: # (4)
-                    s.close()
-                    input.remove(s)
-                    nameList.remove(users.get(s)[0])
-                    clientList.remove(s)
-                    leaveMsg = "%s has left the chat.\n" % name
-                    sys.stdout.write(leaveMsg)
-                    for client in clientList: # (3)
+                else: 
+                    cleanup(s)
+                    sys.stdout.write(ERROR_MSG['leaveMsg'].format(name=name))
+                    for client in clientList:
                         if client is not s:
-                            client.send(leaveMsg)
+                            client.send(ERROR_MSG['leaveMsg'].format(name=name))
             # Typing from the server to all clients.
             if s == sys.stdin: 
                 userText = sys.stdin.readline() 
@@ -135,7 +131,7 @@ def run_server(host, port):
                     for client in clientList:
                         client.send(line)
 
-    selfServer._close() # (5)
+    selfServer._close()
 
 # CLIENT FUNCTION
 # (1): similar to the run_server() function, it will establish a connection
@@ -151,7 +147,7 @@ def run_server(host, port):
 def run_client(host, port):
     name = input_name()
     selfClient = Client(host, int(port))
-    selfClient._connect() # (1)
+    selfClient._connect()
     input.append(selfClient.clientSocket)
     selfClient.clientSocket.send(name)
     running = True
@@ -161,21 +157,21 @@ def run_client(host, port):
 
         for s in inready:
             # Receiving information from the other user (the server).
-            if s == selfClient.clientSocket: # (2)
+            if s == selfClient.clientSocket:
                 data = s.recv(SIZE)
                 if data:
                     sys.stdout.write(data)
-                else: # (3)
+                else:
                     s.close()
-                    print "Connection closed."
+                    print ERROR_MSG['conClosed']
                     running = False
                     break
             # Sending information to the other users via the server.
             if s == sys.stdin: 
                 userText = sys.stdin.readline() 
-                selfClient.clientSocket.send(userText) # (4)
+                selfClient.clientSocket.send(userText)
 
-    selfClient._close() # (5)
+    selfClient._close()
 
 # Self-explanatory (I hope) function that requires a name between 0 and 11
 # characters in length.
@@ -188,6 +184,15 @@ def input_name():
             name = raw_input("Please enter a valid name: ")
     return name
 
+def cleanup(clientSocket): 
+    clientSocket.close()
+    input.remove(clientSocket)
+    if clientSocket in pendingClients:
+        pendingClients.remove(clientSocket)
+    else:
+        nameList.remove(users.get(clientSocket)[0])
+        clientList.remove(clientSocket)
+
 # Close connection from the server.
 def quit(clientSocket, *args):
     try:
@@ -195,11 +200,10 @@ def quit(clientSocket, *args):
         clientList.remove(clientSocket)
         input.remove(clientSocket)
         nameList.remove(users.get(clientSocket)[0])
-        leaveMsg = "%s has left the chat.\n" % name
-        sys.stdout.write(leaveMsg)
+        sys.stdout.write(ERROR_MSG['leaveMsg'].format(name=name))
         for client in clientList: 
             if client is not clientSocket:
-                client.send(leaveMsg)
+                client.send(ERROR_MSG['leaveMsg'].format(name=name))
         clientSocket.close()
     except:
         clientSocket.close()
@@ -209,14 +213,14 @@ def quit(clientSocket, *args):
 def change_name(clientSocket, *args):
     if args[0] in nameList:
         try:
-            clientSocket.send("Name already in use. Please try with another name.\n")
+            clientSocket.send(ERROR_MSG['nameTaken'])
         except:
-            sys.stdout.write("Name already in use. Please try with another name.\n")
+            sys.stdout.write(ERROR_MSG['nameTaken'])
     elif len(args[0]) < 1 and len(args[0]) > 10:
         try:
-            clientSocket.send("Name must be between 1 and 10 characters. Try again.\n")
+            clientSocket.send(ERROR_MSG['nameLen'])
         except:
-            sys.stdout.write("Name must be between 1 and 10 characters. Try again.\n")
+            sys.stdout.write(ERROR_MSG['nameLen'])
     else:
         tempInfo = users.get(clientSocket)
         nameList.remove(tempInfo[0]) 
@@ -230,14 +234,14 @@ def kick_user(clientSocket, *args):
     if users.get(clientSocket)[2] is True:
         if users.get(clientSocket)[0] == args[0]:
             try:
-                clientSocket.send("You cannot kick yourself!\n")
+                clientSocket.send(ERROR_MSG['kickSelf'])
                 return
             except:
-                sys.stdout.write("You cannot kick yourself!\n")
+                sys.stdout.write(ERROR_MSG['kickSelf'])
                 return
         for user in users:
             if users.get(user)[0] == args[0]:
-                user.send("You have been kicked from the server.\n")
+                user.send(ERROR_MSG['youKicked'])
                 user.close()
                 input.remove(user)
                 nameList.remove(users.get(user)[0])
@@ -245,18 +249,18 @@ def kick_user(clientSocket, *args):
                 kickSuccess = True
                 for client in clientList: 
                     if client is not clientSocket and client is not user:
-                        client.send("%s has been kicked from the server.\n" % args[0])
+                        client.send(ERROR_MSG['hasKicked'].format(name=args[0]))
                 try:
-                    clientSocket.send("You have kicked %s from the server.\n" % args[0])
+                    clientSocket.send(ERROR_MSG['youKick'].format(name=args[0]))
                 except:
-                    sys.stdout.write("You have kicked %s from the server.\n" % args[0])
+                    sys.stdout.write(ERROR_MSG['youKick'].format(name=args[0]))
         if kickSuccess is False:
             try:
-                clientSocket.send("Unable to kick %s.\n" % args[0])
+                clientSocket.send(ERROR_MSG['noKick'].format(name=args[0]))
             except:
-                sys.stdout.write("Unable to kick %s.\n" % args[0])
+                sys.stdout.write(ERROR_MSG['noKick'].format(name=args[0]))
     else:
-        clientSocket.send("You do not have permission to do that.\n")
+        clientSocket.send(ERROR_MSG['noPerms'])
 
 def who(clientSocket, *args):
     nameList.sort()
