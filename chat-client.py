@@ -16,7 +16,7 @@ from Client import Client
 #      accounts, ops, etc.
 
 SIZE = 1024 # Buffer size for sending data to sockets (power of 2).
-users = {} # Dictionary containing information on each user.
+users = {} # Dictionary containing information on each user. {socket, [name, address, opstatus]}
 nameList = [] # List of names/aliases logged in.
 clientList = [] # List of connected (not pending) clients.
 pendingClients = [] # For clients that have not yet specified a name.
@@ -58,11 +58,8 @@ def main():
 #      The list-value defines as follows: [name, address, op_status]
 #      op_status will be True or False.
 def run_server(host, port):
-    name = input_name() 
     selfServer = Server(host, int(port)) 
     input.append(selfServer.serverSocket) 
-    nameList.append(name)
-    users.update({selfServer.serverSocket:[name, None, True]}) 
     selfServer._listen() 
     running = True
 
@@ -78,21 +75,17 @@ def run_server(host, port):
                 users.update({client:[None,clientInformation[1], False]})
                 pendingClients.append(client)
             if s in pendingClients:
-                name = s.recv(16)
-                if name:
-                    # Preventing duplicate names (for the most part).
-                    if name not in nameList:
-                        tempInfo = users.get(s)
-                        tempInfo[0] = name
-                        users.update({client:tempInfo})
-                        clientList.append(s)
-                        nameList.append(name)
+                data = s.recv(SIZE)
+                if data:
+                    tempData = data.rstrip("\r\n")
+                    splitData = tempData.split(" ", 1)
+                    splitData.append("\n")
+                    if splitData[0] == "/name":
+                        commandDict[splitData[0]](s, splitData[1])
                         pendingClients.remove(s)
-                    else:
-                        s.send(ERROR_MSG['nameTaken'])
-                        cleanup(s)
+                        clientList.append(s)
                 else:
-                    cleanup(s)
+                    pass 
             # Receiving data from a client, if client is no longer sending data,
             # they are no longer connected (remove them).
             # This will write to all connected clients!
@@ -119,17 +112,7 @@ def run_server(host, port):
                             client.send(ERROR_MSG['leaveMsg'].format(name=name))
             # Typing from the server to all clients.
             if s == sys.stdin: 
-                userText = sys.stdin.readline() 
-                tempData = userText.rstrip("\r\n")
-                splitData = tempData.split(" ", 1)
-                splitData.append("\n") # Placeholder to fix argument issues...
-                if splitData[0] in commandDict.keys():
-                    commandDict[splitData[0]](selfServer.serverSocket, splitData[1])           
-                else:
-                    name = users.get(selfServer.serverSocket)[0]
-                    line = name + ": " + userText
-                    for client in clientList:
-                        client.send(line)
+                pass
 
     selfServer._close()
 
@@ -145,13 +128,13 @@ def run_server(host, port):
 # (5): no condition has been set to close the connection, but the socket is
 #      scheduled to close upon exiting the read/write loop.
 def run_client(host, port):
-    name = input_name()
     selfClient = Client(host, int(port))
     selfClient._connect()
     input.append(selfClient.clientSocket)
-    selfClient.clientSocket.send(name)
     running = True
-    
+    print "Connection established. Please set your name with /name to start chatting."   
+
+ 
     while running is True: 
         inready,outready,exready = select.select(input,[],[]) 
 
@@ -195,35 +178,27 @@ def cleanup(clientSocket):
 
 # Close connection from the server.
 def quit(clientSocket, *args):
-    try:
-        name = users.get(clientSocket)[0]
-        clientList.remove(clientSocket)
-        input.remove(clientSocket)
-        nameList.remove(users.get(clientSocket)[0])
-        sys.stdout.write(ERROR_MSG['leaveMsg'].format(name=name))
-        for client in clientList: 
-            if client is not clientSocket:
-                client.send(ERROR_MSG['leaveMsg'].format(name=name))
-        clientSocket.close()
-    except:
-        clientSocket.close()
+    name = users.get(clientSocket)[0]
+    clientList.remove(clientSocket)
+    input.remove(clientSocket)
+    nameList.remove(users.get(clientSocket)[0])
+    sys.stdout.write(ERROR_MSG['leaveMsg'].format(name=name))
+    for client in clientList: 
+        if client is not clientSocket:
+            client.send(ERROR_MSG['leaveMsg'].format(name=name))
+    clientSocket.close()
 
 # Allow changing of the display name while connected. Must still
 # follow length and duplicate conventions.
 def change_name(clientSocket, *args):
     if args[0] in nameList:
-        try:
-            clientSocket.send(ERROR_MSG['nameTaken'])
-        except:
-            sys.stdout.write(ERROR_MSG['nameTaken'])
+        clientSocket.send(ERROR_MSG['nameTaken'])
     elif len(args[0]) < 1 and len(args[0]) > 10:
-        try:
-            clientSocket.send(ERROR_MSG['nameLen'])
-        except:
-            sys.stdout.write(ERROR_MSG['nameLen'])
+        clientSocket.send(ERROR_MSG['nameLen'])
     else:
         tempInfo = users.get(clientSocket)
-        nameList.remove(tempInfo[0]) 
+        if tempInfo[0] != None:
+            nameList.remove(tempInfo[0]) 
         tempInfo[0] = args[0]
         nameList.append(tempInfo[0])
         users.update({clientSocket:tempInfo})
@@ -233,12 +208,8 @@ def kick_user(clientSocket, *args):
     kickSuccess = False
     if users.get(clientSocket)[2] is True:
         if users.get(clientSocket)[0] == args[0]:
-            try:
-                clientSocket.send(ERROR_MSG['kickSelf'])
-                return
-            except:
-                sys.stdout.write(ERROR_MSG['kickSelf'])
-                return
+            clientSocket.send(ERROR_MSG['kickSelf'])
+            return
         for user in users:
             if users.get(user)[0] == args[0]:
                 user.send(ERROR_MSG['youKicked'])
@@ -250,25 +221,16 @@ def kick_user(clientSocket, *args):
                 for client in clientList: 
                     if client is not clientSocket and client is not user:
                         client.send(ERROR_MSG['hasKicked'].format(name=args[0]))
-                try:
-                    clientSocket.send(ERROR_MSG['youKick'].format(name=args[0]))
-                except:
-                    sys.stdout.write(ERROR_MSG['youKick'].format(name=args[0]))
+                clientSocket.send(ERROR_MSG['youKick'].format(name=args[0]))
         if kickSuccess is False:
-            try:
-                clientSocket.send(ERROR_MSG['noKick'].format(name=args[0]))
-            except:
-                sys.stdout.write(ERROR_MSG['noKick'].format(name=args[0]))
+            clientSocket.send(ERROR_MSG['noKick'].format(name=args[0]))
     else:
         clientSocket.send(ERROR_MSG['noPerms'])
 
 def who(clientSocket, *args):
     nameList.sort()
     connected = ", ".join(nameList) + "\n"
-    try:
-        clientSocket.send(connected)
-    except:
-        sys.stdout.write(connected)
+    clientSocket.send(connected)
 
 # Dictionary containing the names of the functions associated with command input.
 commandDict = {"/quit": quit, "/name": change_name, "/kick": kick_user, "/who": who}
