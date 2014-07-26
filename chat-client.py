@@ -86,6 +86,8 @@ def run_server(host, port):
                         clientList.append(s)
                 else:
                     pass 
+            if s == sys.stdin:
+                pass
             # Receiving data from a client, if client is no longer sending data,
             # they are no longer connected (remove them).
             # This will write to all connected clients!
@@ -152,7 +154,8 @@ def run_client(host, port):
             # Sending information to the other users via the server.
             if s == sys.stdin: 
                 userText = sys.stdin.readline() 
-                selfClient.clientSocket.send(userText)
+                line = userText.rstrip("\r\n")
+                selfClient.clientSocket.send(line)
 
     selfClient._close()
 
@@ -218,7 +221,7 @@ def kick_user(clientSocket, *args):
 
 def who(clientSocket, *args):
     nameList.sort()
-    connected = ", ".join(nameList) + "\n"
+    connected = ", ".join(nameList)
     clientSocket.send(connected)
 
 # Dictionary containing the names of the functions associated with command input.
