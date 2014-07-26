@@ -22,16 +22,16 @@ clientList = [] # List of connected (not pending) clients.
 pendingClients = [] # For clients that have not yet specified a name.
 input = [sys.stdin] # Input list for select().
 
-ERROR_MSG = {'nameTaken': "Name entered is already taken. Try again.\n", \
-             'nameLen'  : "Name must be between 1 and 10 characters. Try again.\n", \
-             'leaveMsg' : "{name} has left the chat.\n", \
-             'conClosed': "Connection closed.\n", \
-             'kickSelf' : "You cannot kick yourself!\n", \
-             'youKicked': "You have been kicked from the server.\n", \
-             'youKick'  : "You have kicked {name} from the server.\n", \
-             'hasKicked': "{name} has been kicked from the server.\n", \
-             'noKick'   : "Unable to kick {name}.\n", \
-             'noPerms'  : "You do not have the permission to do that.\n"}
+ERROR_MSG = {'nameTaken': "Name entered is already taken. Try again.", \
+             'nameLen'  : "Name must be between 1 and 10 characters. Try again.", \
+             'leaveMsg' : "{name} has left the chat.", \
+             'conClosed': "Connection closed.", \
+             'kickSelf' : "You cannot kick yourself!", \
+             'youKicked': "You have been kicked from the server.", \
+             'youKick'  : "You have kicked {name} from the server.", \
+             'hasKicked': "{name} has been kicked from the server.", \
+             'noKick'   : "Unable to kick {name}.", \
+             'noPerms'  : "You do not have the permission to do that."}
 
 def main():
     host = raw_input("Welcome to the chat client. \nPlease type the IP you are trying " + \
@@ -100,7 +100,7 @@ def run_server(host, port):
                         commandDict[splitData[0]](s, splitData[1])
                     else:
                         line = name + ": " + data
-                        sys.stdout.write(line)
+                        print line
                         for client in clientList:
                             if client is not s:
                                 client.send(line)
@@ -143,7 +143,7 @@ def run_client(host, port):
             if s == selfClient.clientSocket:
                 data = s.recv(SIZE)
                 if data:
-                    sys.stdout.write(data)
+                    print data
                 else:
                     s.close()
                     print ERROR_MSG['conClosed']
@@ -155,17 +155,6 @@ def run_client(host, port):
                 selfClient.clientSocket.send(userText)
 
     selfClient._close()
-
-# Self-explanatory (I hope) function that requires a name between 0 and 11
-# characters in length.
-def input_name():
-    name = raw_input("Enter a Name: ")
-    while True:
-        if len(name) > 0 and len(name) < 11:
-            break
-        else: 
-            name = raw_input("Please enter a valid name: ")
-    return name
 
 def cleanup(clientSocket): 
     clientSocket.close()
