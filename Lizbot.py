@@ -5,6 +5,8 @@ import random
 from Server import Server
 from Client import Client
 
+SIZE = 1024
+
 def main():
     host = raw_input("Provide an IP address for the bot: ")
     port = raw_input("Provide a port for the bot: ")
@@ -12,7 +14,7 @@ def main():
     botSocket._connect()
     botSocket.clientSocket.send("/name Lizbot")
     running = True
-    input = [botSocket.clientSocket, sys.stdin]
+    input = [botSocket.clientSocket]
 
     while running is True:
         inready,outready,exready = select.select(input,[],[]) 
@@ -28,13 +30,9 @@ def main():
                             commandDict[splitData[1]](botClient.clientSocket)
                         except:
                             pass
-                    else:
-                        pass
                 else:
                     running = False
                     break
-            if s == sys.stdin:
-                pass
 
 def talk(serverSocket):
     sentences = ["Sam smells like feet.", "Liz is the best.", "I like food.", "2 + 2 = 4", \

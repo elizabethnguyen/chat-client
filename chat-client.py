@@ -20,7 +20,7 @@ users = {} # Dictionary containing information on each user. {socket, [name, add
 nameList = [] # List of names/aliases logged in.
 clientList = [] # List of connected (not pending) clients.
 pendingClients = [] # For clients that have not yet specified a name.
-input = [sys.stdin] # Input list for select().
+input = [] # Input list for select().
 
 ERROR_MSG = {'nameTaken': "Name entered is already taken. Try again.", \
              'nameLen'  : "Name must be between 1 and 10 characters. Try again.", \
@@ -86,8 +86,6 @@ def run_server(host, port):
                         clientList.append(s)
                 else:
                     pass 
-            if s == sys.stdin:
-                pass
             # Receiving data from a client, if client is no longer sending data,
             # they are no longer connected (remove them).
             # This will write to all connected clients!
@@ -113,8 +111,6 @@ def run_server(host, port):
                         if client is not s:
                             client.send(ERROR_MSG['leaveMsg'].format(name=name))
             # Typing from the server to all clients.
-            if s == sys.stdin: 
-                pass
 
     selfServer._close()
 
@@ -133,6 +129,7 @@ def run_client(host, port):
     selfClient = Client(host, int(port))
     selfClient._connect()
     input.append(selfClient.clientSocket)
+    input.append(sys.stdin)
     running = True
     print "Connection established. Please set your name with /name to start chatting."   
 
