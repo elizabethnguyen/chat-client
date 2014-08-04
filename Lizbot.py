@@ -12,9 +12,9 @@ def main():
     port = raw_input("Provide a port for the bot: ")
     botSocket = Client(host, int(port))
     botSocket._connect()
-    botSocket.clientSocket.send("/name Lizbot")
+    botSocket.clientSocket.send("/name Lizbot\n")
     running = True
-    input = [botSocket.clientSocket]
+    input = [botSocket.clientSocket, sys.stdin]
 
     while running is True:
         inready,outready,exready = select.select(input,[],[]) 
@@ -23,24 +23,26 @@ def main():
                 data = s.recv(SIZE)
                 if data:
                     tempData = data.rstrip("\r\n")
-                    splitData = tempData.split(" ", 1)
+                    splitData = tempData.split(" ", 4)
                     splitData.append("\n") # Placeholder to fix argument issues...
-                    if splitData[0] == "Lizbot":
-                        try:
-                            commandDict[splitData[1]](botClient.clientSocket)
-                        except:
+                    if splitData[1] == "Lizbot":
+                        if commandDict.has_key(splitData[2]):
+                            commandDict[splitData[2]](botSocket.clientSocket)
+                        else:
                             pass
                 else:
                     running = False
                     break
+            if s == sys.stdin:
+                pass
 
 def talk(serverSocket):
     sentences = ["Sam smells like feet.", "Liz is the best.", "I like food.", "2 + 2 = 4", \
                  "What is the meaning of life?"]
-    serverSocket.send(random.randint(0,4))
+    serverSocket.send(sentences[random.randint(0,4)])
     
 
-commandDict = {"/talk": talk}
+commandDict = {"talk": talk}
 
 if __name__ == '__main__':
     main()

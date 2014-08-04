@@ -74,18 +74,6 @@ def run_server(host, port):
                 input.append(client)
                 users.update({client:[None,clientInformation[1], False]})
                 pendingClients.append(client)
-            if s in pendingClients:
-                data = s.recv(SIZE)
-                if data:
-                    tempData = data.rstrip("\r\n")
-                    splitData = tempData.split(" ", 1)
-                    splitData.append("\n")
-                    if splitData[0] == "/name":
-                        commandDict[splitData[0]](s, splitData[1])
-                        pendingClients.remove(s)
-                        clientList.append(s)
-                else:
-                    pass 
             # Receiving data from a client, if client is no longer sending data,
             # they are no longer connected (remove them).
             # This will write to all connected clients!
@@ -106,12 +94,22 @@ def run_server(host, port):
                                 client.send(line)
                 else: 
                     cleanup(s)
-                    sys.stdout.write(ERROR_MSG['leaveMsg'].format(name=name))
+                    print ERROR_MSG['leaveMsg'].format(name=name)
                     for client in clientList:
                         if client is not s:
                             client.send(ERROR_MSG['leaveMsg'].format(name=name))
-            # Typing from the server to all clients.
-
+            if s in pendingClients:
+                data = s.recv(SIZE)
+                if data:
+                    tempData = data.rstrip("\r\n")
+                    splitData = tempData.split(" ", 1)
+                    splitData.append("\n")
+                    if splitData[0] == "/name":
+                        commandDict[splitData[0]](s, splitData[1])
+                        pendingClients.remove(s)
+                        clientList.append(s)
+                else:
+                    pass 
     selfServer._close()
 
 # CLIENT FUNCTION
